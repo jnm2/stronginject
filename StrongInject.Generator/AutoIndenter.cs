@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Diagnostics;
 using System.Text;
@@ -14,7 +15,7 @@ internal class AutoIndenter
         BeginLine();
     }
     
-    private readonly StringBuilder _text = new();
+    private readonly SourceTextBuilder _text = new();
     private int _indent;
     const string INDENT = "    ";
     public void Append(string str)
@@ -39,7 +40,9 @@ internal class AutoIndenter
         {
             case '}':
                 _indent--;
-                _text.Remove(_text.Length - 5, 4);
+                var lastChar = _text[_text.Length - 1];
+                _text.RemoveLast(5);
+                _text.Append(lastChar);
                 break;
             case '{':
                 _indent++;
@@ -63,7 +66,7 @@ internal class AutoIndenter
         {
             case '}':
                 _indent--;
-                _text.Remove(_text.Length - 4, 4);
+                _text.RemoveLast(4);
                 break;
             case '{':
                 _indent++;
@@ -75,7 +78,9 @@ internal class AutoIndenter
     
     public void AppendLine()
     {
-        _text.Insert(_text.Length - _indent * 4, Environment.NewLine);
+        _text.RemoveLast(_indent * 4);
+        _text.AppendLine();
+        BeginLine();
     }
 
     private void BeginLine()
@@ -86,10 +91,7 @@ internal class AutoIndenter
         }
     }
 
-    public override string ToString()
-    {
-        return _text.ToString();
-    }
+    public SourceText Build() => _text.Build();
 
     public AutoIndenter GetSubIndenter()
     {
@@ -99,7 +101,7 @@ internal class AutoIndenter
     public void Append(AutoIndenter subIndenter)
     {
         Debug.Assert(subIndenter._indent == _indent);
-        _text.Remove(_text.Length - _indent * 4, _indent * 4);
+        _text.RemoveLast(_indent * 4);
         _text.Append(subIndenter._text);
     }
 }

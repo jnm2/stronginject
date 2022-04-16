@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using StrongInject.Generator.Visitors;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ namespace StrongInject.Generator
 {
     internal class ContainerGenerator
     {
-        public static string GenerateContainerImplementations(
+        public static SourceText GenerateContainerImplementations(
             INamedTypeSymbol container,
             InstanceSourcesScope containerScope,
             WellKnownTypes wellKnownTypes,
@@ -67,7 +68,7 @@ namespace StrongInject.Generator
             _containerDeclarationLocation = ((TypeDeclarationSyntax)_container.DeclaringSyntaxReferences[0].GetSyntax()).Identifier.GetLocation();
         }
 
-        private string GenerateContainerImplementations()
+        private SourceText GenerateContainerImplementations()
         {
             Debug.Assert(_containerMembersSource is null);
             var classMembersIndent = _container.GetContainingTypesAndThis().Count()
@@ -248,7 +249,7 @@ namespace StrongInject.Generator
                 file.AppendLine("}");
             }
             
-            return file.ToString();
+            return file.Build();
         }
 
         private string GetSingleInstanceMethod(InstanceSource instanceSource, bool isAsync)
