@@ -109,7 +109,7 @@ namespace StrongInject.Generator
                 var concreteOwnedType = target.TypeKind == TypeKind.Interface
                     ? (isAsync ? _wellKnownTypes.AsyncOwned : _wellKnownTypes.Owned).Construct(valueType)
                     : target;
-                instanceSource = new OwnedSource(concreteOwnedType, valueType, isAsync);
+                instanceSource = new OwnedSource(concreteOwnedType, valueType, ExistingValueSource: null, isAsync);
 
                 if (target.TypeKind == TypeKind.Interface)
                 {
@@ -158,16 +158,31 @@ namespace StrongInject.Generator
 
                 foreach (var decorator in _decoratorSources.GetValueOrDefault(target, ImmutableArray<DecoratorSource>.Empty))
                 {
-                    instanceSource = new WrappedDecoratorInstanceSource(decorator, instanceSource);
+                    instanceSource = WrapDecoratorInstanceSource(decorator, instanceSource);
                 }
 
                 foreach (var decorator in _genericDecoratorsResolver.ResolveDecorators(target))
                 {
-                    instanceSource = new WrappedDecoratorInstanceSource(decorator, instanceSource);
+                    instanceSource = WrapDecoratorInstanceSource(decorator, instanceSource);
                 }
             }
 
             return instanceSource;
+        }
+
+        private InstanceSource WrapDecoratorInstanceSource(DecoratorSource decorator, InstanceSource underlying)
+        {
+            var decoratedParameterType = decorator.GetDecoratedParameter().Type;
+            if (!decoratedParameterType.Equals(decorator.OfType)
+                && decoratedParameterType.IsWellKnownOwnedType(out var isAsync, out var valueType))
+            {
+                var concreteOwnedType = decoratedParameterType.TypeKind == TypeKind.Interface
+                    ? (isAsync ? _wellKnownTypes.AsyncOwned : _wellKnownTypes.Owned).Construct(valueType)
+                    : decoratedParameterType;
+                underlying = new OwnedSource(concreteOwnedType, valueType, ExistingValueSource: underlying, isAsync);
+            }
+
+            return new WrappedDecoratorInstanceSource(decorator, underlying);
         }
 
         public InstanceSource this[ITypeSymbol typeSymbol]

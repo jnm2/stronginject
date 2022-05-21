@@ -126,7 +126,8 @@ namespace StrongInject.Generator.Visitors
 
         public virtual void Visit(OwnedSource ownedSource, State state)
         {
-            VisitCore(GetInstanceSource(ownedSource.OwnedValueType, state, null), state);
+            var valueSource = ownedSource.ExistingValueSource ?? GetInstanceSource(ownedSource.OwnedValueType, state, null);
+            VisitCore(valueSource, state);
         }
     }
 }

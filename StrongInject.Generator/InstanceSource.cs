@@ -207,6 +207,7 @@ namespace StrongInject.Generator
     internal sealed record OwnedSource(
         ITypeSymbol OwnedType,
         ITypeSymbol OwnedValueType,
+        InstanceSource? ExistingValueSource, // TODO: mutual exclusivity between OwnedValueType and ExistingValueSource
         bool IsAsync) : InstanceSource(Scope.InstancePerDependency, IsAsync: IsAsync, CanDecorate: true)
     {
         public override ITypeSymbol OfType => OwnedType;

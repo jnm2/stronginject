@@ -201,7 +201,7 @@ namespace StrongInject.Generator.Visitors
             }
             else if (source is OwnedSource ownedSource)
             {
-                var internalTarget = GetInstanceSource(ownedSource.OwnedValueType, state, null)!;
+                var internalTarget = ownedSource.ExistingValueSource ?? GetInstanceSource(ownedSource.OwnedValueType, state, null)!;
                 var internalOperations = LowerResolution(
                     requiresAsyncChecker: _requiresAsyncChecker,
                     internalTarget,

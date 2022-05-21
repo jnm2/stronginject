@@ -120,5 +120,65 @@ namespace StrongInject.Tests.Integration
             owned.Dispose();
             Assert.True(owned.Value.IsDisposed);
         }
+
+        [Register(typeof(SomeAppWindow))]
+        [Register(typeof(SomeOtherAppWindow))]
+        [Register(typeof(DisposableDependency))]
+        public partial class DecoratorFactoryContainer : IContainer<SomeAppWindow>
+        {
+            [DecoratorFactory]
+            private static T DecorateComponentWhichInitiatesOwnDisposal<T>(Owned<T> ownedComponent) where T : Component
+            {
+                ownedComponent.Value.Disposed += OnDisposed;
+                return ownedComponent.Value;
+
+                void OnDisposed(object? sender, EventArgs e)
+                {
+                    ownedComponent.Value.Disposed -= OnDisposed;
+                    ownedComponent.Dispose();
+                }
+            }
+        }
+
+        // This window can show windows which can outlive it.
+        public record SomeAppWindow(Func<SomeOtherAppWindow> SomeOtherAppWindowFactory);
+
+        // This disposes itself when closed
+        public record SomeOtherAppWindow(DisposableDependency DisposableDependency) : Component
+        {
+            public void SimulateCloseButtonClick() => Dispose();
+        }
+
+        // E.g. in System.ComponentModel
+        public record Component : IDisposable
+        {
+            public event EventHandler? Disposed;
+
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                if (IsDisposed) return;
+                IsDisposed = true;
+                Disposed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        [Fact]
+        public void DecoratorFactoriesCanReleaseDecoratedInstances()
+        {
+            using var container = new DecoratorFactoryContainer();
+
+            var firstWindowOwned = container.Resolve();
+            var secondWindow = firstWindowOwned.Value.SomeOtherAppWindowFactory();
+
+            firstWindowOwned.Dispose();
+            Assert.False(secondWindow.IsDisposed);
+            Assert.False(secondWindow.DisposableDependency.IsDisposed);
+
+            secondWindow.SimulateCloseButtonClick();
+            Assert.True(secondWindow.IsDisposed);
+            Assert.True(secondWindow.DisposableDependency.IsDisposed);
+        }
     }
 }

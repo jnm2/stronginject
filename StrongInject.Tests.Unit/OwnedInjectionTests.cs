@@ -2181,5 +2181,157 @@ partial class Container
 }
 ");
         }
+
+        // TODO: Support IOwned, AsyncOwned, IAsyncOwned
+        // TODO: Diagnostic for mismatch between AsyncOwned<T> and Owned<T> in and out (what about IOwned<T> vs Owned<T>?)
+        // TODO: Error if the resolved Owned instance is not an OwnedSource (e.g. circularity between [Factory] and [DecoratorFactory])
+        [Fact]
+        public void DecoratorFactoriesCanTakeOwned()
+        {
+            string userSource = @"
+using System;
+using StrongInject;
+
+[Register(typeof(SomeAppWindow))]
+[Register(typeof(SomeOtherAppWindow))]
+[Register(typeof(NeedsDisposal))]
+public partial class Container : IContainer<SomeAppWindow>
+{
+    [DecoratorFactory]
+    private static T DecorateComponentWhichInitiatesOwnDisposal<T>(Owned<T> ownedComponent) where T : Component
+    {
+        ownedComponent.Value.Disposed += OnDisposed;
+        return ownedComponent.Value;
+
+        void OnDisposed(object sender, EventArgs e)
+        {
+            ownedComponent.Value.Disposed -= OnDisposed;
+            ownedComponent.Dispose();
+        }
+    }
+}
+
+// This window can show windows which can outlive it.
+public record SomeAppWindow(Func<SomeOtherAppWindow> SomeOtherAppWindowFactory);
+
+// This disposes itself when closed
+public class SomeOtherAppWindow : Component { public SomeOtherAppWindow(NeedsDisposal needsDisposal) { } }
+
+public record NeedsDisposal : IDisposable { public void Dispose() { } };
+
+// E.g. in System.ComponentModel
+public class Component : IDisposable
+{
+    public event EventHandler Disposed;
+
+    public void Dispose() { Disposed?.Invoke(this, EventArgs.Empty); }
+}
+";
+            var comp = RunGeneratorWithStrongInjectReference(userSource, out var generatorDiagnostics, out var generated);
+            generatorDiagnostics.Verify();
+            comp.GetDiagnostics().Verify();
+            var file = Assert.Single(generated);
+            file.Should().BeIgnoringLineEndings(@"#pragma warning disable CS1998
+partial class Container
+{
+    private int _disposed = 0;
+    private bool Disposed => _disposed != 0;
+    public void Dispose()
+    {
+        var disposed = global::System.Threading.Interlocked.Exchange(ref this._disposed, 1);
+        if (disposed != 0)
+            return;
+    }
+
+    TResult global::StrongInject.IContainer<global::SomeAppWindow>.Run<TResult, TParam>(global::System.Func<global::SomeAppWindow, TParam, TResult> func, TParam param)
+    {
+        if (Disposed)
+            throw new global::System.ObjectDisposedException(nameof(Container));
+        global::System.Func<global::SomeOtherAppWindow> func_0_1;
+        global::SomeAppWindow someAppWindow_0_0;
+        func_0_1 = null;
+        func_0_1 = () =>
+        {
+            global::StrongInject.Owned<global::SomeOtherAppWindow> owned_1_1;
+            global::SomeOtherAppWindow someOtherAppWindow_1_0;
+            global::StrongInject.Owned<global::SomeOtherAppWindow> CreateOwnedSomeOtherAppWindow_2()
+            {
+                global::NeedsDisposal needsDisposal_1_1;
+                global::SomeOtherAppWindow someOtherAppWindow_1_0;
+                needsDisposal_1_1 = new global::NeedsDisposal();
+                try
+                {
+                    someOtherAppWindow_1_0 = new global::SomeOtherAppWindow(needsDisposal: needsDisposal_1_1);
+                }
+                catch
+                {
+                    ((global::System.IDisposable)needsDisposal_1_1).Dispose();
+                    throw;
+                }
+                return new global::StrongInject.Owned<global::SomeOtherAppWindow>(someOtherAppWindow_1_0, () =>
+                {
+                    ((global::System.IDisposable)someOtherAppWindow_1_0).Dispose();
+                    ((global::System.IDisposable)needsDisposal_1_1).Dispose();
+                });
+            }
+            owned_1_1 = CreateOwnedSomeOtherAppWindow_2();
+            someOtherAppWindow_1_0 = global::Container.DecorateComponentWhichInitiatesOwnDisposal<global::SomeOtherAppWindow>(ownedComponent: owned_1_1);
+            return someOtherAppWindow_1_0;
+        };
+        someAppWindow_0_0 = new global::SomeAppWindow(SomeOtherAppWindowFactory: func_0_1);
+        TResult result;
+        try
+        {
+            result = func(someAppWindow_0_0, param);
+        }
+        finally
+        {
+        }
+        return result;
+    }
+
+    global::StrongInject.Owned<global::SomeAppWindow> global::StrongInject.IContainer<global::SomeAppWindow>.Resolve()
+    {
+        if (Disposed)
+            throw new global::System.ObjectDisposedException(nameof(Container));
+        global::System.Func<global::SomeOtherAppWindow> func_0_1;
+        global::SomeAppWindow someAppWindow_0_0;
+        func_0_1 = null;
+        func_0_1 = () =>
+        {
+            global::StrongInject.Owned<global::SomeOtherAppWindow> owned_1_1;
+            global::SomeOtherAppWindow someOtherAppWindow_1_0;
+            global::StrongInject.Owned<global::SomeOtherAppWindow> CreateOwnedSomeOtherAppWindow_2()
+            {
+                global::NeedsDisposal needsDisposal_1_1;
+                global::SomeOtherAppWindow someOtherAppWindow_1_0;
+                needsDisposal_1_1 = new global::NeedsDisposal();
+                try
+                {
+                    someOtherAppWindow_1_0 = new global::SomeOtherAppWindow(needsDisposal: needsDisposal_1_1);
+                }
+                catch
+                {
+                    ((global::System.IDisposable)needsDisposal_1_1).Dispose();
+                    throw;
+                }
+                return new global::StrongInject.Owned<global::SomeOtherAppWindow>(someOtherAppWindow_1_0, () =>
+                {
+                    ((global::System.IDisposable)someOtherAppWindow_1_0).Dispose();
+                    ((global::System.IDisposable)needsDisposal_1_1).Dispose();
+                });
+            }
+            owned_1_1 = CreateOwnedSomeOtherAppWindow_2();
+            someOtherAppWindow_1_0 = global::Container.DecorateComponentWhichInitiatesOwnDisposal<global::SomeOtherAppWindow>(ownedComponent: owned_1_1);
+            return someOtherAppWindow_1_0;
+        };
+        someAppWindow_0_0 = new global::SomeAppWindow(SomeOtherAppWindowFactory: func_0_1);
+        return new global::StrongInject.Owned<global::SomeAppWindow>(someAppWindow_0_0, () =>
+        {
+        });
+    }
+}
+");
+        }
     }
 }

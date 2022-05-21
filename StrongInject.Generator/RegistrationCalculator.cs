@@ -1421,7 +1421,12 @@ namespace StrongInject.Generator
                     var isAsync = returnType.IsWellKnownTaskType(_wellKnownTypes, out var taskOfType);
                     var decoratorOfType = isAsync ? taskOfType : returnType;
 
-                    var decoratedParameters = method.Parameters.Where(x => x.Type.Equals(decoratorOfType)).ToList();
+                    var decoratedParameters = method.Parameters
+                        .Where(x =>
+                            x.Type.Equals(decoratorOfType)
+                            || (x.Type.IsWellKnownOwnedType(isAsync: out _, out var ownedType) && ownedType.Equals(decoratorOfType)))
+                        .ToList();
+
                     if (decoratedParameters.Count == 0)
                     {
                         reportDiagnostic(DecoratorFactoryMethodDoesNotHaveParameterOfDecoratedType(attribute, method, decoratorOfType, _cancellationToken));
